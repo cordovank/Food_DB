@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+import os
 
 class Settings(BaseSettings):
     """Local configuration.
@@ -14,11 +15,15 @@ class Settings(BaseSettings):
 
     # Paths
     project_root: Path = Path(__file__).resolve().parents[2]
-    db_path: Path = Path(__import__("os").getenv("DB_PATH", str(project_root / "data" / "food_database.db")))
+    db_path: Path = Path(os.getenv("DB_PATH", str(project_root / "data" / "food_database.db")))
 
     # Streamlit
-    ui_host: str = __import__("os").getenv("UI_HOST", "0.0.0.0")  # bind on LAN
-    ui_port: int = int(__import__("os").getenv("UI_PORT", "8501"))
+    ui_host: str = os.getenv("UI_HOST", "0.0.0.0")  # bind on LAN
+    ui_port: int = int(os.getenv("UI_PORT", "8501"))
 
+    # OCR backend: tesseract (current) or ollama_vision
+    ocr_backend: str = os.getenv("OCR_BACKEND", "tesseract")  # tesseract|ollama_vision
+    ollama_vision_model: str = os.getenv("OLLAMA_VISION_MODEL", "qwen3-vl:8b")
+    ollama_host: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 settings = Settings()

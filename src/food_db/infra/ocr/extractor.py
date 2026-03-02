@@ -37,6 +37,9 @@ class FoodOCRExtractor:
 
         if self.tesseract_cmd:
             pytesseract.pytesseract.tesseract_cmd = self.tesseract_cmd
+        
+        # Ensure HEIC/HEIF files become readable PNG for cv2
+        image_path = self._ensure_readable_image_path(image_path)
 
         img = cv2.imread(str(image_path))
         if img is None:
