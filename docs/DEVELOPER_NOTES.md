@@ -1,103 +1,245 @@
 ## Developer Notes (Architecture + Where to Add Features)
 
-FoodDB follows a **clean-ish layering** so UI/CLI stay thin and all behavior is testable:
+FoodDB uses a **clean-ish layered architecture** so UI/CLI stay thin, and most behavior stays testable and reusable.
 
-### High-level flow
+### High-level flow (what calls what)
 
-- **UI / CLI**  
+* **Config (single source of truth)**
+  `src/food_db/config.py` loads all runtime settings via env / `.env`, including:
+
+  * `DB_PATH` (shared by CLI + UI)
+  * Streamlit bind: `UI_HOST`, `UI_PORT`
+  * OCR routing: `OCR_BACKEND` (`tesseract` | `ollama_vision`)
+  * Ollama: `OLLAMA_HOST`, `OLLAMA_VISION_MODEL`
+
+* **UI / CLI (thin adapters)**
   `src/food_db/ui/app.py` and `src/food_db/cli/main.py` should mostly:
-  - collect input
-  - call a usecase/service
-  - display results/errors
 
-- **Usecases (workflow orchestration)**  
-  `src/food_db/core/usecases.py` is where “multi-step” operations live, e.g.:
-  - OCR image → text → parse → normalize → upsert food
-  - parse text → normalize units → return `FoodCreate`
-  - export DB → JSON/CSV
+  * collect user input
+  * call a **usecase** or **service**
+  * render output / actionable errors
+    **Do not** touch SQLAlchemy sessions directly from UI/CLI.
 
-- **Services (business rules)**  
-  `src/food_db/core/services.py` holds “domain decisions”, e.g.:
-  - how to upsert (unique key rules)
-  - variant selection (brand/store priority)
-  - validation decisions (what’s required, how to handle missing fields)
-  - data cleanup rules (rounding, default units)
+* **Usecases (workflow orchestration)**
+  `src/food_db/core/usecases.py` is where multi-step flows live, especially those that combine infra adapters + parsing:
 
-- **Repository (data access contract)**  
-  `src/food_db/core/repository.py` is the boundary between business logic and persistence:
-  - CRUD methods (`upsert_food`, `search_foods`, `add_variant`, `list_units`, etc.)
-  - conversion helpers that require DB lookups (unit tables)
-  - keep this layer deterministic and easy to unit test (prefer no Streamlit/CLI dependencies)
+  * OCR image → text → parse → return `ParsedNutrition`
+  * routing OCR backend via `settings.ocr_backend`
 
-- **Infra (adapters / external dependencies)**  
-  `src/food_db/infra/` is “impure code” and integrations:
-  - `infra/db/sql_db.py`: SQLAlchemy engine/session + ORM mapping
-  - `infra/ocr/extractor.py`: OCR + HEIC/HEIF compatibility (Pillow -> temp PNG -> OpenCV)
-  - `infra/nlp/processor.py`: regex-first parsing / text normalization
+* **Services (business rules + app facade)**
+  `src/food_db/core/services.py` exposes the `FoodDatabase` facade used by CLI/UI:
 
-- **Core models**  
-  `src/food_db/core/models.py` defines the Pydantic models used across layers:
-  - `FoodCreate`, `FoodUpdate`, `FoodVariantCreate`, `NutritionParseResult`, etc.
-  - This is where schema rules live (types, defaults, optionality).
+  * Foods CRUD + upsert rules (`upsert_food` uses name uniqueness)
+  * Smart search (SQL candidate fetch + fuzzy ranking)
+  * Units + conversions
+  * Variants CRUD + distinct lists (`stores()`, `brands()`)
+  * Inventory CRUD + inventory overview (`inventory_all()`)
+  * Export JSON/CSV
+  * “Parsed → FoodCreate → upsert” (`add_from_parsed`)
 
-### Where to add common features
+* **Repository (DB boundary)**
+  `src/food_db/core/repository.py` is the persistence boundary:
 
-#### 1) “Smart search” (fuzzy + filters)
-- Add matching logic in **services**:
-  - `core/services.py`: `search_foods_smart(query, filters)`
-- Keep SQL filtering in **repository**:
-  - `core/repository.py`: add optional filters (category, brand, store)
-- UI changes:
-  - `ui/app.py`: add filter widgets + call the new service method
+  * schema init + lightweight migration
+  * deterministic CRUD queries
+  * “broad candidate retrieval” for smart search
+  * joined inventory queries for admin/inventory pages
+    The repository is where SQLAlchemy lives.
 
-#### 2) Inventory forecasting (basic ML / regression)
-- Put the “forecast pipeline” in **usecases**:
-  - `core/usecases.py`: `forecast_consumption(food_id, horizon_days=30)`
-- Store time-series events in DB (new table):
-  - extend `infra/db/sql_db.py` with a table like `consumption_events`
-- ML logic can live in `core/services.py` or a new module:
-  - `core/forecasting.py` (clean separation)
+* **Infra (impure adapters)**
+  `src/food_db/infra/` contains external integration code:
 
-#### 3) LLM integration (meal plans / macro balance)
-- Add a new adapter under **infra**:
-  - `infra/llm/client.py` (OpenAI/Ollama/etc. behind a simple interface)
-- Put orchestration in **usecases**:
-  - `core/usecases.py`: `generate_meal_plan(nutrition_dict, preferences)`
-- Keep prompt templates in a dedicated folder:
-  - `src/food_db/prompts/…` (optional but recommended)
-- Avoid importing LLM deps in core; keep it behind the infra adapter.
+  * `infra/db/sql_db.py`: engine/session factory (SQLite; `check_same_thread=False`)
+  * OCR:
 
-#### 4) Unit/brand selection dropdowns (DB-driven UI)
-- Repository:
-  - `list_distinct_brands()`, `list_distinct_stores()`, `list_units()`
-- UI:
-  - `ui/app.py`: convert text inputs to `selectbox` populated from repo calls
-- Services:
-  - enforce canonicalization rules (e.g., “Costco Wholesale” vs “Costco”)
+    * `infra/ocr/extractor.py`: Tesseract/OpenCV OCR + HEIC/HEIF conversion via Pillow+pillow-heif
+    * `infra/ocr/ollama_vision.py`: Ollama vision OCR using OpenAI-compatible API
+    * `infra/ocr/errors.py`: typed OCR exceptions
+    * `infra/ocr/image_utils.py`: normalize images to PNG bytes + base64 encoding
+  * Parsing:
 
-#### 5) More robust OCR parsing
-- Keep OCR strictly “image -> text” in `infra/ocr/extractor.py`
-- Improve parsing in `infra/nlp/processor.py` (regex patterns, label heuristics)
-- Glue logic in `core/usecases.py`:
-  - apply cleaning + parsing + normalization + warnings
+    * `infra/nlp/processor.py`: regex-first label parsing into `ParsedNutrition`
 
-### Guardrails / Engineering tips
+* **Core models (ORM + Pydantic contracts)**
+  `src/food_db/core/models.py` contains:
 
-- **Don’t let UI/CLI talk to SQLAlchemy sessions directly.**  
-  Always go through `FoodDatabase` / repository methods so behavior is consistent.
+  * SQLAlchemy ORM: `Food`, `Unit`, `FoodVariant`, `InventoryItem`, `FoodUnit`
+  * Pydantic contracts: `FoodCreate/Update/Out`, `Unit*`, `FoodVariant*`, `ParsedNutrition`
+  * Inventory Pydantic contracts: `InventoryItemCreate/Update/Out`
 
-- **Normalize units at boundaries.**  
-  Parsing may return `mg` or `oz`, but `services/usecases` should normalize to:
-  - grams for macros (`protein_g`, `fat_g`, etc.)
-  - mg for sodium (`sodium_mg`)
-  - keep original `serving_unit` but store normalized values consistently
+---
 
-- **Keep OCR optional.**  
-  Don’t import OpenCV/pytesseract unless called (lazy import), so base installs stay light.
+## Data model & invariants (current reality)
 
-- **Testing strategy**
-  - `tests/test_repository.py`: CRUD + unit conversions using a temp SQLite file
-  - `tests/test_processor.py`: parsing reliability from sample label text
-  - `tests/test_usecases.py`: end-to-end “parse->upsert” without Streamlit
+* **foods**
+
+  * canonical identity is `Food.name` (unique)
+  * stores base serving + nutrition facts + label context fields (servings per container, serving_size_text, serving_mass_g, micronutrients, ingredients, best_by_date)
+
+* **food_variants**
+
+  * optional store/brand/price/package sizing tied to a canonical food
+  * used for filtering (brand/store) and inventory linkage
+
+* **inventory_items**
+
+  * tracks quantities “on hand”, tied to a **variant** (not directly to canonical food)
+
+* **units** and **food_units**
+
+  * `units` holds weight conversion factors to grams where applicable
+  * `food_units` can encode per-food conversions where needed (e.g., tbsp → grams for peanut butter)
+
+---
+
+## Schema initialization & migrations
+
+### `FoodRepository.init_db()`
+
+This method does two things:
+
+1. `Base.metadata.create_all(...)`
+   Creates tables for ORM models (including `inventory_items` / `food_variants` / etc.) if missing.
+
+2. **Lightweight migration for `foods` only**
+   Uses `PRAGMA table_info(foods)` then `ALTER TABLE foods ADD COLUMN ...` for newly introduced food columns.
+   This is intentionally lightweight and avoids a full migration framework.
+
+3. Seeds default `units` if missing.
+
+**Rule:** if you add new columns to `foods`, extend the `add_col(...)` list in `init_db()`.
+If you add a *new table*, it should be created automatically via `create_all()` (but consider data backfills separately).
+
+---
+
+## OCR + parsing pipeline
+
+### Orchestration: `core/usecases.py`
+
+`ocr_image_to_nutrition(image_path)` chooses OCR backend by `settings.ocr_backend`:
+
+* `tesseract` (default): `FoodOCRExtractor()`
+* `ollama_vision`: `OllamaVisionOCRExtractor(host, model)`
+
+Then:
+
+* calls `FoodTextProcessor().parse(text)`
+* sets `parsed.raw_text = text`
+
+### OCR adapters (infra)
+
+* **Tesseract/OpenCV**: `infra/ocr/extractor.py`
+
+  * lazy imports for OCR deps
+  * HEIC/HEIF supported via PIL decode → temp PNG → OpenCV
+* **Ollama vision**: `infra/ocr/ollama_vision.py`
+
+  * converts image → PNG bytes → base64
+  * calls Ollama using OpenAI-compatible `chat.completions`
+
+**Guardrail:** OCR modules should remain “image → text only”. Parsing stays in `infra/nlp/processor.py`.
+
+---
+
+## Smart search (how it works today)
+
+Smart search is implemented in **service + repository**:
+
+* **Repository: `search_foods_filtered(...)`**
+
+  * fast SQL candidate retrieval with optional filters (category, brand, store)
+  * uses `LIKE` prefilter across canonical + variant fields
+  * includes a fallback: if `LIKE` yields 0 rows, fetch a filtered candidate pool without the text predicate (so fuzzy matching can still succeed)
+
+* **Service: `search_foods_smart(...)`**
+
+  * scores candidates using `utils.search.fuzzy_score`
+  * scores against multiple candidate strings (name, “brand name”, “category name”)
+  * thresholded by `min_score`, then sorted
+
+**Rule:** keep “DB narrowing” in repository, and “ranking / heuristics” in services.
+
+---
+
+## Inventory (where it lives)
+
+* Repository methods:
+
+  * `add_inventory_item`, `update_inventory_item`, `delete_inventory_item`
+  * `list_inventory_for_variant`
+  * `list_inventory_all()` returns joined, display-friendly rows (InventoryItem + Variant + Food)
+  * `admin_counts()` returns counts for foods/variants/inventory
+
+* Service methods:
+
+  * thin pass-throughs: `add_inventory_item`, `inventory_all`, etc.
+
+**Rule:** inventory joins/aggregation belongs in repository; any “business interpretation” belongs in services/usecases.
+
+---
+
+## Where to add common features
+
+### 1) Add new CLI commands / flags
+
+* Keep parsing/validation in CLI
+* Route behavior to `FoodDatabase` methods (service)
+* Avoid importing SQLAlchemy in CLI
+
+### 2) Add a new workflow (multi-step)
+
+Example: “OCR → parse → auto-save with optional overrides”
+
+* Put orchestration in `core/usecases.py`
+* Reuse infra adapters + `FoodTextProcessor`
+* Persist using `FoodDatabase` service methods
+
+### 3) Extend OCR backends
+
+* Add a new adapter in `infra/ocr/`
+* Add a new `OCR_BACKEND` option in config
+* Update routing in `core/usecases.ocr_image_to_nutrition`
+
+### 4) Add new columns / evolve schema
+
+* For new **foods** columns: update `FoodRepository.init_db()` migration block
+* For new tables: define ORM model in `core/models.py` and rely on `create_all()`
+* If you need backfills, add an explicit one-time usecase/command (don’t hide it in UI)
+
+### 5) Improve parsing reliability
+
+* Keep improvements in `infra/nlp/processor.py` (regex, heuristics)
+* Add warnings to `ParsedNutrition.warnings` for low confidence / missing fields
+* Add “golden” parsing tests with sample label text
+
+---
+
+## Guardrails & reliability tips
+
+* **Single DB path**: CLI + UI must share `settings.db_path` so refresh reflects writes.
+* **Optional dependencies**:
+
+  * OCR deps are lazy-imported (don’t import them from core/services)
+  * CSV export requires pandas; keep it optional (current behavior)
+* **Surface actionable failures**:
+
+  * OCR: raise typed `OCRException` (or `RuntimeError` for missing deps)
+  * CLI: exit codes for invalid input; keep messages concise and direct
+
+---
+
+## Testing strategy (what to prioritize)
+
+* Repository tests using temp SQLite files:
+
+  * schema init + seed
+  * CRUD for foods/variants/inventory
+  * smart search fallback behavior
+* Parser tests (no OCR required):
+
+  * parse a set of sample label texts → assert extracted fields + warnings
+* Usecase tests:
+
+  * “parse text → ParsedNutrition → add_from_parsed → stored food”
 
 ---
