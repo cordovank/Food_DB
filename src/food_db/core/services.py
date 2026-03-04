@@ -130,15 +130,34 @@ class FoodDatabase:
             name=parsed.name,
             brand=parsed.brand,
             category=parsed.category,
+
             serving_size=parsed.serving_size,
             serving_unit=parsed.serving_unit,
+            servings_per_container=parsed.servings_per_container,
+            serving_size_text=parsed.serving_size_text,
+            serving_mass_g=parsed.serving_mass_g,
+
             calories=parsed.calories,
             protein_g=parsed.protein_g,
             carbs_g=parsed.carbs_g,
             fat_g=parsed.fat_g,
+
+            saturated_fat_g=parsed.saturated_fat_g,
+            trans_fat_g=parsed.trans_fat_g,
+            cholesterol_mg=parsed.cholesterol_mg,
+
             fiber_g=parsed.fiber_g,
             sugar_g=parsed.sugar_g,
+            added_sugar_g=parsed.added_sugar_g,
             sodium_mg=parsed.sodium_mg,
+
+            vitamin_d_mcg=parsed.vitamin_d_mcg,
+            calcium_mg=parsed.calcium_mg,
+            iron_mg=parsed.iron_mg,
+            potassium_mg=parsed.potassium_mg,
+
+            ingredients=parsed.ingredients,
+            best_by_date=parsed.best_by_date,
         )
         return self.upsert_food(data)
 

@@ -186,6 +186,16 @@ with colB:
                 "fiber_g": current.fiber_g,
                 "sugar_g": current.sugar_g,
                 "sodium_mg": current.sodium_mg,
+                #  TODO - add the following:
+                # servings_per_container
+                # serving_size_text
+                # serving_mass_g
+                # saturated/trans fat
+                # cholesterol
+                # added sugars
+                # vitamin/minerals
+                # ingredients
+                # best_by_date
             })
 
             with st.expander("Edit", expanded=False):

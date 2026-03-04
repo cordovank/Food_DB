@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from sqlalchemy import select, delete, or_, and_
+from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 
 from food_db.core.models import (
@@ -45,7 +46,34 @@ class FoodRepository:
 
     def init_db(self) -> None:
         Base.metadata.create_all(self.db.engine)
-        # Seed units
+
+        # 1) lightweight migration (ALTER TABLE foods ADD COLUMN ...)
+        with self.db.engine.begin() as conn:
+            cols = conn.execute(sql_text("PRAGMA table_info(foods)")).fetchall()
+            existing = {row[1] for row in cols}  # row[1] = name
+
+            def add_col(name: str, ddl: str):
+                if name not in existing:
+                    conn.execute(sql_text(f"ALTER TABLE foods ADD COLUMN {name} {ddl}"))
+
+            add_col("servings_per_container", "FLOAT")
+            add_col("serving_size_text", "VARCHAR")
+            add_col("serving_mass_g", "FLOAT")
+
+            add_col("saturated_fat_g", "FLOAT")
+            add_col("trans_fat_g", "FLOAT")
+            add_col("cholesterol_mg", "FLOAT")
+            add_col("added_sugar_g", "FLOAT")
+
+            add_col("vitamin_d_mcg", "FLOAT")
+            add_col("calcium_mg", "FLOAT")
+            add_col("iron_mg", "FLOAT")
+            add_col("potassium_mg", "FLOAT")
+
+            add_col("ingredients", "VARCHAR")
+            add_col("best_by_date", "DATE")
+
+        # 2) Seed units
         with get_session(self.db) as s:
             existing = {u.unit_symbol for u in s.scalars(select(Unit)).all()}
             for u in DEFAULT_UNITS:
@@ -287,8 +315,13 @@ class FoodRepository:
             name=food.name,
             brand=food.brand,
             category=food.category,
+
             serving_size=food.serving_size,
             serving_unit=food.serving_unit,
+            servings_per_container=food.servings_per_container,
+            serving_size_text=food.serving_size_text,
+            serving_mass_g=food.serving_mass_g,
+
             calories=food.calories,
             protein_g=food.protein_g,
             carbs_g=food.carbs_g,
@@ -298,6 +331,19 @@ class FoodRepository:
             sodium_mg=food.sodium_mg,
             created_at=food.created_at,
             updated_at=food.updated_at,
+
+            saturated_fat_g=food.saturated_fat_g,
+            trans_fat_g=food.trans_fat_g,
+            cholesterol_mg=food.cholesterol_mg,
+            added_sugar_g=food.added_sugar_g,
+
+            vitamin_d_mcg=food.vitamin_d_mcg,
+            calcium_mg=food.calcium_mg,
+            iron_mg=food.iron_mg,
+            potassium_mg=food.potassium_mg,
+
+            ingredients=food.ingredients,
+            best_by_date=food.best_by_date,
         )
 
     @staticmethod

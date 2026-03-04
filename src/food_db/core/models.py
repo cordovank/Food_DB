@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 
 from pydantic import BaseModel, Field
 from sqlalchemy import (
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -40,6 +41,10 @@ class Food(Base):
     # Base serving
     serving_size: Mapped[Optional[float]] = mapped_column(Float, default=None)
     serving_unit: Mapped[Optional[str]] = mapped_column(String, default=None)  # e.g., g, oz
+    # Serving / package context
+    servings_per_container: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    serving_size_text: Mapped[Optional[str]] = mapped_column(String, default=None)  # raw label phrase
+    serving_mass_g: Mapped[Optional[float]] = mapped_column(Float, default=None)   # parsed grams when present
 
     # Nutrition (per serving)
     calories: Mapped[Optional[float]] = mapped_column(Float, default=None)
@@ -49,6 +54,20 @@ class Food(Base):
     fiber_g: Mapped[Optional[float]] = mapped_column(Float, default=None)
     sugar_g: Mapped[Optional[float]] = mapped_column(Float, default=None)
     sodium_mg: Mapped[Optional[float]] = mapped_column(Float, default=None)
+
+    # Additional nutrition facts
+    saturated_fat_g: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    trans_fat_g: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    cholesterol_mg: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    added_sugar_g: Mapped[Optional[float]] = mapped_column(Float, default=None)
+
+    vitamin_d_mcg: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    calcium_mg: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    iron_mg: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    potassium_mg: Mapped[Optional[float]] = mapped_column(Float, default=None)
+
+    ingredients: Mapped[Optional[str]] = mapped_column(String, default=None)
+    best_by_date: Mapped[Optional[date]] = mapped_column(Date, default=None)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -149,14 +168,31 @@ class FoodCreate(BaseModel):
 
     serving_size: Optional[float] = None
     serving_unit: Optional[str] = None
+    servings_per_container: Optional[float] = None
+    serving_size_text: Optional[str] = None
+    serving_mass_g: Optional[float] = None
 
     calories: Optional[float] = None
     protein_g: Optional[float] = None
     carbs_g: Optional[float] = None
     fat_g: Optional[float] = None
+
+    saturated_fat_g: Optional[float] = None
+    trans_fat_g: Optional[float] = None
+    cholesterol_mg: Optional[float] = None
+
     fiber_g: Optional[float] = None
     sugar_g: Optional[float] = None
+    added_sugar_g: Optional[float] = None
     sodium_mg: Optional[float] = None
+
+    vitamin_d_mcg: Optional[float] = None
+    calcium_mg: Optional[float] = None
+    iron_mg: Optional[float] = None
+    potassium_mg: Optional[float] = None
+
+    ingredients: Optional[str] = None
+    best_by_date: Optional[date] = None
 
 
 class FoodUpdate(BaseModel):
@@ -166,14 +202,31 @@ class FoodUpdate(BaseModel):
 
     serving_size: Optional[float] = None
     serving_unit: Optional[str] = None
+    servings_per_container: Optional[float] = None
+    serving_size_text: Optional[str] = None
+    serving_mass_g: Optional[float] = None
 
     calories: Optional[float] = None
     protein_g: Optional[float] = None
     carbs_g: Optional[float] = None
     fat_g: Optional[float] = None
+
+    saturated_fat_g: Optional[float] = None
+    trans_fat_g: Optional[float] = None
+    cholesterol_mg: Optional[float] = None
+
     fiber_g: Optional[float] = None
     sugar_g: Optional[float] = None
+    added_sugar_g: Optional[float] = None
     sodium_mg: Optional[float] = None
+
+    vitamin_d_mcg: Optional[float] = None
+    calcium_mg: Optional[float] = None
+    iron_mg: Optional[float] = None
+    potassium_mg: Optional[float] = None
+
+    ingredients: Optional[str] = None
+    best_by_date: Optional[date] = None
 
 
 class FoodOut(BaseModel):
@@ -184,14 +237,31 @@ class FoodOut(BaseModel):
 
     serving_size: Optional[float]
     serving_unit: Optional[str]
+    servings_per_container: Optional[float] = None
+    serving_size_text: Optional[str] = None
+    serving_mass_g: Optional[float] = None
 
     calories: Optional[float]
     protein_g: Optional[float]
     carbs_g: Optional[float]
     fat_g: Optional[float]
+
+    saturated_fat_g: Optional[float] = None
+    trans_fat_g: Optional[float] = None
+    cholesterol_mg: Optional[float] = None
+
     fiber_g: Optional[float]
     sugar_g: Optional[float]
+    added_sugar_g: Optional[float] = None
     sodium_mg: Optional[float]
+
+    vitamin_d_mcg: Optional[float] = None
+    calcium_mg: Optional[float] = None
+    iron_mg: Optional[float] = None
+    potassium_mg: Optional[float] = None
+
+    ingredients: Optional[str] = None
+    best_by_date: Optional[date] = None
 
     created_at: datetime
     updated_at: datetime
@@ -243,14 +313,31 @@ class ParsedNutrition(BaseModel):
 
     serving_size: Optional[float] = None
     serving_unit: Optional[str] = None
+    servings_per_container: Optional[float] = None
+    serving_size_text: Optional[str] = None
+    serving_mass_g: Optional[float] = None
 
     calories: Optional[float] = None
     protein_g: Optional[float] = None
     carbs_g: Optional[float] = None
     fat_g: Optional[float] = None
+
+    saturated_fat_g: Optional[float] = None
+    trans_fat_g: Optional[float] = None
+    cholesterol_mg: Optional[float] = None
+
     fiber_g: Optional[float] = None
     sugar_g: Optional[float] = None
+    added_sugar_g: Optional[float] = None
     sodium_mg: Optional[float] = None
+
+    vitamin_d_mcg: Optional[float] = None
+    calcium_mg: Optional[float] = None
+    iron_mg: Optional[float] = None
+    potassium_mg: Optional[float] = None
+
+    ingredients: Optional[str] = None
+    best_by_date: Optional[date] = None
 
     raw_text: Optional[str] = Field(default=None, description="Original extracted text")
     warnings: list[str] = Field(default_factory=list)

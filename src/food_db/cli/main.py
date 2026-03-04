@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 from typing import Optional
 
@@ -13,6 +14,33 @@ from food_db.core.models import FoodCreate, FoodUpdate, FoodVariantCreate
 from food_db.core.services import make_food_db
 from food_db.core.usecases import parse_text_to_nutrition, ocr_image_to_nutrition
 
+
+def _parse_date(s: str | None) -> date | None:
+    """
+    Accepts:
+      - YYYY-MM-DD
+      - MM/DD/YYYY
+    Returns a datetime.date or None.
+    """
+    if not s:
+        return None
+    s = s.strip()
+    if not s:
+        return None
+
+    # ISO: 2027-08-04
+    try:
+        return date.fromisoformat(s)
+    except Exception:
+        pass
+
+    # US: 08/04/2027
+    try:
+        mm, dd, yyyy = s.split("/")
+        return date(int(yyyy), int(mm), int(dd))
+    except Exception:
+        raise typer.BadParameter("Invalid date format. Use YYYY-MM-DD or MM/DD/YYYY.")
+    
 
 app = typer.Typer(help="FoodDB CLI")
 
@@ -59,8 +87,24 @@ def food_add(
     sugar_g: Optional[float] = typer.Option(None),
     sodium_mg: Optional[float] = typer.Option(None),
     upsert: bool = typer.Option(True, help="Upsert by name"),
+
+    servings_per_container: Optional[float] = typer.Option(None),
+    serving_size_text: Optional[str] = typer.Option(None),
+    serving_mass_g: Optional[float] = typer.Option(None),
+    saturated_fat_g: Optional[float] = typer.Option(None),
+    trans_fat_g: Optional[float] = typer.Option(None),
+    cholesterol_mg: Optional[float] = typer.Option(None),
+    added_sugar_g: Optional[float] = typer.Option(None),
+    vitamin_d_mcg: Optional[float] = typer.Option(None),
+    calcium_mg: Optional[float] = typer.Option(None),
+    iron_mg: Optional[float] = typer.Option(None),
+    potassium_mg: Optional[float] = typer.Option(None),
+    ingredients: Optional[str] = typer.Option(None),
+    best_by_date: Optional[str] = typer.Option(None, help="YYYY-MM-DD or MM/DD/YYYY"),
 ):
     db = _db()
+    best_by = _parse_date(best_by_date)
+
     data = FoodCreate(
         name=name,
         brand=brand,
@@ -74,6 +118,20 @@ def food_add(
         fiber_g=fiber_g,
         sugar_g=sugar_g,
         sodium_mg=sodium_mg,
+
+        servings_per_container=servings_per_container,
+        serving_size_text=serving_size_text,
+        serving_mass_g=serving_mass_g,
+        saturated_fat_g=saturated_fat_g,
+        trans_fat_g=trans_fat_g,
+        cholesterol_mg=cholesterol_mg,
+        added_sugar_g=added_sugar_g,
+        vitamin_d_mcg=vitamin_d_mcg,
+        calcium_mg=calcium_mg,
+        iron_mg=iron_mg,
+        potassium_mg=potassium_mg,
+        ingredients=ingredients,
+        best_by_date=best_by,
     )
     out = db.upsert_food(data) if upsert else db.add_food(data)
     print(f"[green]OK[/green] saved food id={out.id} name='{out.name}'")
@@ -136,8 +194,25 @@ def food_update(
     fiber_g: Optional[float] = typer.Option(None),
     sugar_g: Optional[float] = typer.Option(None),
     sodium_mg: Optional[float] = typer.Option(None),
+
+    servings_per_container: Optional[float] = typer.Option(None),
+    serving_size_text: Optional[str] = typer.Option(None),
+    serving_mass_g: Optional[float] = typer.Option(None),
+    saturated_fat_g: Optional[float] = typer.Option(None),
+    trans_fat_g: Optional[float] = typer.Option(None),
+    cholesterol_mg: Optional[float] = typer.Option(None),
+    added_sugar_g: Optional[float] = typer.Option(None),
+    vitamin_d_mcg: Optional[float] = typer.Option(None),
+    calcium_mg: Optional[float] = typer.Option(None),
+    iron_mg: Optional[float] = typer.Option(None),
+    potassium_mg: Optional[float] = typer.Option(None),
+    ingredients: Optional[str] = typer.Option(None),
+    best_by_date: Optional[str] = typer.Option(None, help="YYYY-MM-DD or MM/DD/YYYY"),
+
 ):
     db = _db()
+    best_by = _parse_date(best_by_date) if best_by_date is not None else None
+
     patch = FoodUpdate(
         name=name,
         brand=brand,
@@ -151,6 +226,20 @@ def food_update(
         fiber_g=fiber_g,
         sugar_g=sugar_g,
         sodium_mg=sodium_mg,
+
+        servings_per_container=servings_per_container,
+        serving_size_text=serving_size_text,
+        serving_mass_g=serving_mass_g,
+        saturated_fat_g=saturated_fat_g,
+        trans_fat_g=trans_fat_g,
+        cholesterol_mg=cholesterol_mg,
+        added_sugar_g=added_sugar_g,
+        vitamin_d_mcg=vitamin_d_mcg,
+        calcium_mg=calcium_mg,
+        iron_mg=iron_mg,
+        potassium_mg=potassium_mg,
+        ingredients=ingredients,
+        best_by_date=best_by,
     )
     out = db.update_food(food_id, patch)
     if not out:
