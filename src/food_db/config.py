@@ -26,4 +26,9 @@ class Settings(BaseSettings):
     ollama_vision_model: str = os.getenv("OLLAMA_VISION_MODEL", "qwen3-vl:8b")
     ollama_host: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
+    # Search defaults
+    search_min_score:      float = float(os.getenv("SEARCH_MIN_SCORE",      "0.35"))
+    search_candidate_limit: int  = int(os.getenv("SEARCH_CANDIDATE_LIMIT",  "200"))
+    search_result_limit:    int  = int(os.getenv("SEARCH_RESULT_LIMIT",     "50"))
+
 settings = Settings()

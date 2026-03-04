@@ -20,6 +20,11 @@ from food_db.core.models import (
     UnitOut,
     FoodVariantCreate,
     FoodVariantOut,
+    InventoryItem,
+    InventoryItemCreate,
+    InventoryItemUpdate,
+    InventoryItemOut,
+    InventoryRowOut
 )
 from food_db.infra.db.sql_db import DbHandle, make_db, get_session
 
@@ -43,9 +48,22 @@ class FoodRepository:
     # -------------------------
     # Schema
     # -------------------------
-
+    # MIGRATION RULE: only ADD columns here. Never rename or drop.
+    # SQLite does not support DROP COLUMN in older versions.
+    # For destructive changes, create a new migration script instead.
+    
     def init_db(self) -> None:
         Base.metadata.create_all(self.db.engine)
+
+        # ── Lightweight migration for the `foods` table ──────────────────
+        # RULES:
+        #   1. Only ADD columns here — never rename or drop.
+        #   2. SQLite ≥ 3.35 supports DROP COLUMN but older versions don't;
+        #      avoid it for portability.
+        #   3. For destructive schema changes, write a standalone migration
+        #      script rather than embedding it here.
+        #   4. New *tables* are handled automatically by create_all() above.
+        # ──────────────────────────────────────────────────────────────────
 
         # 1) lightweight migration (ALTER TABLE foods ADD COLUMN ...)
         with self.db.engine.begin() as conn:
@@ -296,6 +314,86 @@ class FoodRepository:
             return sorted({b for b in (canon + variant) if b})
         
     # -------------------------
+    # Inventory
+    # -------------------------
+    
+    def add_inventory_item(self, data: InventoryItemCreate) -> InventoryItemOut:
+        with get_session(self.db) as s:
+            item = InventoryItem(**data.model_dump(exclude_none=True))
+            s.add(item)
+            s.commit()
+            s.refresh(item)
+            return self._inventory_out(item)
+
+    def list_inventory_for_variant(self, variant_id: int) -> list[InventoryItemOut]:
+        from sqlalchemy import select
+        with get_session(self.db) as s:
+            rows = s.scalars(
+                select(InventoryItem)
+                .where(InventoryItem.variant_id == variant_id)
+                .order_by(InventoryItem.purchase_date.desc())
+            ).all()
+            return [self._inventory_out(r) for r in rows]
+
+    def update_inventory_item(self, item_id: int, patch: InventoryItemUpdate) -> InventoryItemOut | None:
+        with get_session(self.db) as s:
+            item = s.get(InventoryItem, item_id)
+            if not item:
+                return None
+            for k, v in patch.model_dump(exclude_unset=True).items():
+                setattr(item, k, v)
+            s.commit()
+            s.refresh(item)
+            return self._inventory_out(item)
+
+    def delete_inventory_item(self, item_id: int) -> bool:
+        from sqlalchemy import delete
+        with get_session(self.db) as s:
+            res = s.execute(delete(InventoryItem).where(InventoryItem.id == item_id))
+            s.commit()
+            return (res.rowcount or 0) > 0
+
+    def list_inventory_all(self) -> list[dict]:
+        """
+        Admin/inventory page helper:
+        return inventory rows with joined food + variant context for display.
+        """
+        with get_session(self.db) as s:
+            stmt = (
+                select(InventoryItem, FoodVariant, Food)
+                .join(FoodVariant, FoodVariant.id == InventoryItem.variant_id)
+                .join(Food, Food.id == FoodVariant.food_id)
+                .order_by(InventoryItem.purchase_date.desc())
+            )
+        out = []
+        for item, var, food in s.execute(stmt).all():
+            out.append(InventoryRowOut(
+                inventory_id=item.id,
+                food_id=food.id,
+                food_name=food.name,
+                canonical_brand=food.brand,
+                store=var.store_name,
+                variant_brand=var.brand,
+                quantity=item.quantity,
+                unit=item.unit,
+                purchase_date=item.purchase_date,
+                variant_id=var.id,
+            ))
+        return out
+
+    # -------------------------
+    # Admin stats
+    # -------------------------
+
+    def admin_counts(self) -> dict:
+        from sqlalchemy import select, func
+        with get_session(self.db) as s:
+            foods = s.scalar(select(func.count()).select_from(Food)) or 0
+            variants = s.scalar(select(func.count()).select_from(FoodVariant)) or 0
+            inv = s.scalar(select(func.count()).select_from(InventoryItem)) or 0
+            return {"foods": int(foods), "variants": int(variants), "inventory_items": int(inv)}    
+
+    # -------------------------
     # Export
     # -------------------------
 
@@ -368,4 +466,14 @@ class FoodRepository:
             package_unit=v.package_unit,
             notes=v.notes,
             created_at=v.created_at,
+        )
+    
+    @staticmethod
+    def _inventory_out(i: InventoryItem) -> InventoryItemOut:
+        return InventoryItemOut(
+            id=i.id,
+            variant_id=i.variant_id,
+            quantity=i.quantity,
+            unit=i.unit,
+            purchase_date=i.purchase_date,
         )

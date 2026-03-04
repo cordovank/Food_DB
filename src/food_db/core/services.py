@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from food_db.core.models import FoodCreate, FoodUpdate, ParsedNutrition, FoodVariantCreate
+from food_db.config import settings as _settings
+from food_db.core.models import FoodCreate, FoodUpdate, ParsedNutrition, FoodVariantCreate, InventoryItemCreate, InventoryItemUpdate
 from food_db.core.repository import FoodRepository
 from food_db.utils.search import fuzzy_score
 
@@ -34,6 +35,9 @@ class FoodDatabase:
 
     def get_food(self, food_id: int):
         return self.repo.get_food(food_id)
+    
+    def get_food_by_name(self, name: str):
+        return self.repo.get_food_by_name(name)
 
     def search_foods(self, query: str, category: Optional[str] = None):
         return self.repo.search_foods(query, category=category)
@@ -68,13 +72,18 @@ class FoodDatabase:
         category: Optional[str] = None,
         brand: Optional[str] = None,
         store: Optional[str] = None,
-        limit: int = 50,
-        min_score: float = 0.35,
-        candidate_limit: int = 200,
+        limit: int | None = None,
+        min_score: float | None = None,
+        candidate_limit: int | None = None,
     ):
         """
         Smart search = SQL prefilter (candidates) + fuzzy ranking + filters.
         """
+
+        limit           = limit           or _settings.search_result_limit
+        min_score       = min_score       or _settings.search_min_score
+        candidate_limit = candidate_limit or _settings.search_candidate_limit
+
         if not query.strip():
             return []
 
@@ -116,6 +125,28 @@ class FoodDatabase:
 
     def brands(self) -> list[str]:
         return self.repo.list_unique_brands()
+
+    # -------------------------
+    # Inventory
+    # -------------------------
+
+    def add_inventory_item(self, data: InventoryItemCreate):
+        return self.repo.add_inventory_item(data)
+
+    def list_inventory_for_variant(self, variant_id: int):
+        return self.repo.list_inventory_for_variant(variant_id)
+
+    def update_inventory_item(self, item_id: int, patch: InventoryItemUpdate):
+        return self.repo.update_inventory_item(item_id, patch)
+
+    def delete_inventory_item(self, item_id: int) -> bool:
+        return self.repo.delete_inventory_item(item_id)
+
+    def inventory_all(self) -> list[dict]:
+        return self.repo.list_inventory_all()
+
+    def admin_counts(self) -> dict:
+        return self.repo.admin_counts()
 
     # -------------------------
     # Workflows

@@ -341,3 +341,37 @@ class ParsedNutrition(BaseModel):
 
     raw_text: Optional[str] = Field(default=None, description="Original extracted text")
     warnings: list[str] = Field(default_factory=list)
+
+# --- add near other Pydantic models ---
+
+class InventoryItemCreate(BaseModel):
+    variant_id: int
+    quantity: Optional[float] = None
+    unit: Optional[str] = None
+    purchase_date: Optional[datetime] = None  # if None, DB default is fine
+
+
+class InventoryItemUpdate(BaseModel):
+    quantity: Optional[float] = None
+    unit: Optional[str] = None
+    purchase_date: Optional[datetime] = None
+
+
+class InventoryItemOut(BaseModel):
+    id: int
+    variant_id: int
+    quantity: Optional[float]
+    unit: Optional[str]
+    purchase_date: datetime
+
+class InventoryRowOut(BaseModel):
+    inventory_id: int
+    food_id: int
+    food_name: str
+    canonical_brand: Optional[str]
+    store: Optional[str]
+    variant_brand: Optional[str]
+    quantity: Optional[float]
+    unit: Optional[str]
+    purchase_date: datetime
+    variant_id: int
