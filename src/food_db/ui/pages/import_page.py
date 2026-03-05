@@ -100,10 +100,11 @@ def _run_ocr(img, settings):
             from food_db.core.usecases import ocr_image_to_nutrition
             st.session_state[KEY_PARSED] = ocr_image_to_nutrition(tmp_png)
             st.success("OCR complete — review below.")
-
         except OCRException as e:
             st.error(f"OCR failed: {e.message}")
             _ocr_hint(e.error_type, settings)
+        finally:
+            tmp_png.unlink(missing_ok=True)
 
     except RuntimeError as e:
         st.error(str(e))

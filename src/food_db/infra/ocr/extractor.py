@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import cv2
+import numpy as np
+import pillow_heif
+import pytesseract
+import tempfile
+
 from dataclasses import dataclass
 from pathlib import Path
-
 # Compatibility with HEIC/HEIF extension images
 from io import BytesIO
 from PIL import Image
-import tempfile
-import pillow_heif
 
 
 # Enable PIL to open HEIC/HEIF
@@ -26,36 +29,33 @@ class FoodOCRExtractor:
     tesseract_cmd: str | None =  r'/opt/homebrew/bin/tesseract'
 
     def extract_text(self, image_path: Path) -> str:
-        try:
-            import cv2  # type: ignore
-            import numpy as np  # type: ignore
-            import pytesseract  # type: ignore
-        except Exception as e:
-            raise RuntimeError(
-                "OCR dependencies not installed. Run: uv sync --extra ocr"
-            ) from e
-
         if self.tesseract_cmd:
             pytesseract.pytesseract.tesseract_cmd = self.tesseract_cmd
         
         # Ensure HEIC/HEIF files become readable PNG for cv2
-        image_path = self._ensure_readable_image_path(image_path)
+        resolved = self._ensure_readable_image_path(image_path)
+        # Track whether we created a temp file so we can clean it up
+        temp_created = resolved != image_path
 
-        img = cv2.imread(str(image_path))
-        if img is None:
-            raise FileNotFoundError(f"Could not read image: {image_path}")
+        try:
+            img = cv2.imread(str(image_path))
+            if img is None:
+                raise FileNotFoundError(f"Could not read image: {image_path}")
 
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        gray = cv2.bilateralFilter(gray, 9, 75, 75)
-        _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            gray = cv2.bilateralFilter(gray, 9, 75, 75)
+            _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        # small morphology open to reduce noise
-        kernel = np.ones((1, 1), np.uint8)
-        binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+            # small morphology open to reduce noise
+            kernel = np.ones((1, 1), np.uint8)
+            binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
 
-        config = r"--oem 3 --psm 6"
-        text = pytesseract.image_to_string(binary, config=config)
-        return (text or "").strip()
+            config = r"--oem 3 --psm 6"
+            text = pytesseract.image_to_string(binary, config=config)
+            return (text or "").strip()
+        finally:
+            if temp_created:
+                resolved.unlink(missing_ok=True)
 
     @staticmethod
     def save_uploaded_image_to_tempfile(uploaded_file) -> Path:
