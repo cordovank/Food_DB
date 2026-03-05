@@ -54,44 +54,50 @@ class FoodRepository:
     
     def init_db(self) -> None:
         Base.metadata.create_all(self.db.engine)
-
-        # ── Lightweight migration for the `foods` table ──────────────────
-        # RULES:
-        #   1. Only ADD columns here — never rename or drop.
-        #   2. SQLite ≥ 3.35 supports DROP COLUMN but older versions don't;
-        #      avoid it for portability.
-        #   3. For destructive schema changes, write a standalone migration
-        #      script rather than embedding it here.
-        #   4. New *tables* are handled automatically by create_all() above.
-        # ──────────────────────────────────────────────────────────────────
-
-        # 1) lightweight migration (ALTER TABLE foods ADD COLUMN ...)
         with self.db.engine.begin() as conn:
-            cols = conn.execute(sql_text("PRAGMA table_info(foods)")).fetchall()
-            existing = {row[1] for row in cols}  # row[1] = name
 
-            def add_col(name: str, ddl: str):
-                if name not in existing:
+            # ── foods migration ────────────────────────────────────────────
+            foods_cols = {row[1] for row in conn.execute(sql_text("PRAGMA table_info(foods)")).fetchall()}
+
+            def add_food_col(name: str, ddl: str):
+                if name not in foods_cols:
                     conn.execute(sql_text(f"ALTER TABLE foods ADD COLUMN {name} {ddl}"))
 
-            add_col("servings_per_container", "FLOAT")
-            add_col("serving_size_text", "VARCHAR")
-            add_col("serving_mass_g", "FLOAT")
+            add_food_col("servings_per_container", "FLOAT")
+            add_food_col("serving_size_text",      "VARCHAR")
+            add_food_col("serving_mass_g",         "FLOAT")
+            add_food_col("saturated_fat_g",        "FLOAT")
+            add_food_col("trans_fat_g",            "FLOAT")
+            add_food_col("cholesterol_mg",         "FLOAT")
+            add_food_col("added_sugar_g",          "FLOAT")
+            add_food_col("vitamin_d_mcg",          "FLOAT")
+            add_food_col("calcium_mg",             "FLOAT")
+            add_food_col("iron_mg",                "FLOAT")
+            add_food_col("potassium_mg",           "FLOAT")
+            add_food_col("ingredients",            "VARCHAR")
+            add_food_col("best_by_date",           "DATE")
 
-            add_col("saturated_fat_g", "FLOAT")
-            add_col("trans_fat_g", "FLOAT")
-            add_col("cholesterol_mg", "FLOAT")
-            add_col("added_sugar_g", "FLOAT")
+        # ── food_variants migration ────────────────────────────────────
+        # Add new food_variants columns here as the schema evolves.
+        # All columns currently match the ORM — no ALTER needed yet.
+        # Example for future use:
+        #   variant_cols = {row[1] for row in conn.execute(sql_text("PRAGMA table_info(food_variants)")).fetchall()}
+        #   def add_variant_col(name, ddl):
+        #       if name not in variant_cols:
+        #           conn.execute(sql_text(f"ALTER TABLE food_variants ADD COLUMN {name} {ddl}"))
+        #   add_variant_col("quantity_threshold", "FLOAT")
 
-            add_col("vitamin_d_mcg", "FLOAT")
-            add_col("calcium_mg", "FLOAT")
-            add_col("iron_mg", "FLOAT")
-            add_col("potassium_mg", "FLOAT")
+        # ── inventory_items migration ──────────────────────────────────
+        # Add new inventory_items columns here as the schema evolves.
+        # All columns currently match the ORM — no ALTER needed yet.
+        # Example for future use:
+        #   inv_cols = {row[1] for row in conn.execute(sql_text("PRAGMA table_info(inventory_items)")).fetchall()}
+        #   def add_inv_col(name, ddl):
+        #       if name not in inv_cols:
+        #           conn.execute(sql_text(f"ALTER TABLE inventory_items ADD COLUMN {name} {ddl}"))
+        #   add_inv_col("expiry_date", "DATE")
 
-            add_col("ingredients", "VARCHAR")
-            add_col("best_by_date", "DATE")
-
-        # 2) Seed units
+        # ── Seed units ─────────────────────────────────────────────────────
         with get_session(self.db) as s:
             existing = {u.unit_symbol for u in s.scalars(select(Unit)).all()}
             for u in DEFAULT_UNITS:
