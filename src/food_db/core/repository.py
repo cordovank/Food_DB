@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
 
-from sqlalchemy import select, delete, or_, and_
+from sqlalchemy import select, delete, or_, and_, func
 from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 
@@ -347,7 +347,6 @@ class FoodRepository:
             return self._inventory_out(item)
 
     def delete_inventory_item(self, item_id: int) -> bool:
-        from sqlalchemy import delete
         with get_session(self.db) as s:
             res = s.execute(delete(InventoryItem).where(InventoryItem.id == item_id))
             s.commit()
@@ -365,28 +364,27 @@ class FoodRepository:
                 .join(Food, Food.id == FoodVariant.food_id)
                 .order_by(InventoryItem.purchase_date.desc())
             )
-        out = []
-        for item, var, food in s.execute(stmt).all():
-            out.append(InventoryRowOut(
-                inventory_id=item.id,
-                food_id=food.id,
-                food_name=food.name,
-                canonical_brand=food.brand,
-                store=var.store_name,
-                variant_brand=var.brand,
-                quantity=item.quantity,
-                unit=item.unit,
-                purchase_date=item.purchase_date,
-                variant_id=var.id,
-            ))
-        return out
+            out = []
+            for item, var, food in s.execute(stmt).all():
+                out.append(InventoryRowOut(
+                    inventory_id=item.id,
+                    food_id=food.id,
+                    food_name=food.name,
+                    canonical_brand=food.brand,
+                    store=var.store_name,
+                    variant_brand=var.brand,
+                    quantity=item.quantity,
+                    unit=item.unit,
+                    purchase_date=item.purchase_date,
+                    variant_id=var.id,
+                ))
+            return out
 
     # -------------------------
     # Admin stats
     # -------------------------
 
     def admin_counts(self) -> dict:
-        from sqlalchemy import select, func
         with get_session(self.db) as s:
             foods = s.scalar(select(func.count()).select_from(Food)) or 0
             variants = s.scalar(select(func.count()).select_from(FoodVariant)) or 0
