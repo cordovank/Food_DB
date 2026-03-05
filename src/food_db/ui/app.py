@@ -25,8 +25,8 @@ st.title("🍎 FoodDB")
 st.caption(f"SQLite: {settings.db_path}")
 
 # --- Navigation (top horizontal) ---
-tab_foods, tab_import, tab_inventory, tab_admin, tab_units = st.tabs(
-    ["Foods", "Import", "Inventory", "DB/Admin", "Units"]
+tab_foods, tab_import, tab_inventory, tab_export, tab_units = st.tabs(
+    ["Foods", "Import", "Inventory", "Export", "Units"]
 )
 
 with tab_foods:
@@ -38,30 +38,9 @@ with tab_import:
 with tab_inventory:
     inventory_page(db=db)
 
-with tab_admin:
+with tab_export:
     admin_page(db=db, settings=settings)
 
 with tab_units:
     units_page(db=db)
     
-# with st.sidebar:
-#     st.header("Navigation")
-#     page = st.radio(
-#         "Go to",
-#         ["Foods", "Import", "Inventory", "DB / Admin", "Units"],
-#         index=0,
-#         label_visibility="collapsed",
-#     )
-#     st.divider()
-#     st.caption("Advanced controls are inside pages (keeps sidebar calm).")
-
-# if page == "Foods":
-#     foods_page(db=db)
-# elif page == "Import":
-#     import_page(db=db, settings=settings)
-# elif page == "Inventory":
-#     inventory_page(db=db)
-# elif page == "DB / Admin":
-#     admin_page(db=db, settings=settings)
-# elif page == "Units":
-#     units_page(db=db)
