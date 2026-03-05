@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 import os
@@ -9,26 +11,50 @@ class Settings(BaseSettings):
     """Local configuration.
 
     Override values via environment variables or a `.env` file.
+    All fields use pydantic-settings env loading — do NOT use os.getenv()
+    inside this class body, as that bypasses .env file support.
     """
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding="utf-8", 
+        extra="ignore"
+    )
 
     # Paths
-    project_root: Path = Path(__file__).resolve().parents[2]
-    db_path: Path = Path(os.getenv("DB_PATH", str(project_root / "data" / "food_database.db")))
+    project_root: Path = Field(default_factory=lambda: Path(__file__).resolve().parents[2])
+    db_path: Optional[Path] = Field(default=None)
+    # db_path: Path = Path(os.getenv("DB_PATH", str(project_root / "data" / "food_database.db")))
 
     # Streamlit
-    ui_host: str = os.getenv("UI_HOST", "0.0.0.0")  # bind on LAN
-    ui_port: int = int(os.getenv("UI_PORT", "8501"))
+    ui_host: str = Field(default="0.0.0.0")  # bind on LAN
+    ui_port: int = Field(default=8501)
 
     # OCR backend: tesseract (current) or ollama_vision
-    ocr_backend: str = os.getenv("OCR_BACKEND", "tesseract")  # tesseract|ollama_vision
-    ollama_vision_model: str = os.getenv("OLLAMA_VISION_MODEL", "qwen3-vl:8b")
-    ollama_host: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    ocr_backend: str = Field(default="tesseract")
+    ocr_tesseract_cmd: Optional[str] = Field(
+        default=None,
+        description=(
+            "Absolute path to the tesseract binary. "
+            "Leave unset to use whatever is on PATH (works on Linux and most macOS installs). "
+            "Override via OCR_TESSERACT_CMD env var or .env file. "
+            "Example: OCR_TESSERACT_CMD=/opt/homebrew/bin/tesseract"
+        ),
+    )
+    ollama_vision_model: str = Field(default="qwen3-vl:8b")
+    ollama_host: str = Field(default="http://localhost:11434")
 
     # Search defaults
-    search_min_score:      float = float(os.getenv("SEARCH_MIN_SCORE",      "0.35"))
-    search_candidate_limit: int  = int(os.getenv("SEARCH_CANDIDATE_LIMIT",  "200"))
-    search_result_limit:    int  = int(os.getenv("SEARCH_RESULT_LIMIT",     "50"))
+    search_min_score:      float = Field(default=0.35)
+    search_candidate_limit: int  = Field(default=200)
+    search_result_limit:    int  = Field(default=50)
 
+    def model_post_init(self, __context) -> None:
+        # Resolve db_path default after project_root is known
+        if self.db_path is None:
+            object.__setattr__(
+                self, "db_path", self.project_root / "data" / "food_database.db"
+            )
+
+            
 settings = Settings()
