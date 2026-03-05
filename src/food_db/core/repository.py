@@ -247,7 +247,19 @@ class FoodRepository:
                 rows = s.scalars(fallback_stmt).all()
 
             return [self._food_out(r) for r in rows]
-        
+    
+    def list_foods_paged(self, *, offset: int = 0, limit: int = 50,) -> list[FoodOut]:
+        """Return foods alphabetically for browse/empty-search display."""
+        with get_session(self.db) as s:
+            stmt = (
+                select(Food)
+                .order_by(Food.name.asc())
+                .offset(offset)
+                .limit(max(1, int(limit)))
+            )
+            rows = s.scalars(stmt).all()
+            return [self._food_out(r) for r in rows]
+
     # -------------------------
     # Units
     # -------------------------

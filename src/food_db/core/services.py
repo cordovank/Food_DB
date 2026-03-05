@@ -41,6 +41,10 @@ class FoodDatabase:
 
     def search_foods(self, query: str, category: Optional[str] = None):
         return self.repo.search_foods(query, category=category)
+    
+    def list_foods_paged(self, *, offset: int = 0, limit: int = 50) -> list[FoodOut]:
+        """Alphabetical food list for browse/empty-search display."""
+        return self.repo.list_foods_paged(offset=offset, limit=limit)
 
     def update_food(self, food_id: int, patch: FoodUpdate):
         return self.repo.update_food(food_id, patch)

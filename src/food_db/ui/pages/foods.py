@@ -74,27 +74,31 @@ def render_page(*, db):
         )
 
     # ── Run search ────────────────────────────────────────────────────────
-    rows = []
-    if q.strip():
-        filt = st.session_state[KEY_FILTERS]
-        if use_smart:
-            rows = db.search_foods_smart(
-                q,
-                category=filt["category"],
-                brand=filt["brand"],
-                store=filt["store"],
-                limit=int(limit),
-                min_score=float(min_score),
-            )
-        else:
-            rows = db.search_foods(q, category=filt["category"])
+    filt = st.session_state[KEY_FILTERS]
+    browsing = not q.strip()
 
-    left, right = st.columns([2, 3], gap="large")
+    if browsing:
+        rows = db.list_foods_paged(limit=int(limit))
+    elif use_smart:
+        rows = db.search_foods_smart(
+            q,
+            category=filt["category"],
+            brand=filt["brand"],
+            store=filt["store"],
+            limit=int(limit),
+            min_score=float(min_score),
+        )
+    else:
+        rows = db.search_foods(q, category=filt["category"])
 
     # ── Results list ──────────────────────────────────────────────────────
+    left, right = st.columns([2, 3], gap="large")
+
     with left:
         st.markdown("#### Results")
-        if q.strip() and not rows:
+        if browsing:
+            st.caption(f"Showing first {len(rows)} foods — type to search")
+        elif not rows:
             st.info("No matches")
 
         options = {f"{r.id} · {r.name}": r.id for r in rows}
