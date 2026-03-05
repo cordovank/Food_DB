@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -16,7 +18,6 @@ class DbHandle:
 
 def make_engine(db_path: Path) -> Engine:
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    # check_same_thread=False allows Streamlit + CLI to share the same sqlite file safely
     return create_engine(
         f"sqlite:///{db_path.as_posix()}",
         future=True,
@@ -27,9 +28,28 @@ def make_engine(db_path: Path) -> Engine:
 
 def make_db(db_path: Path) -> DbHandle:
     engine = make_engine(db_path)
-    SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+    SessionLocal = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
+    )
     return DbHandle(engine=engine, SessionLocal=SessionLocal)
 
 
-def get_session(db: DbHandle) -> Session:
-    return db.SessionLocal()
+@contextmanager
+def get_session(db: DbHandle) -> Generator[Session, None, None]:
+    """Yield a Session that rolls back automatically on any exception.
+
+    Repository methods must still call s.commit() explicitly when
+    they want to persist changes.  On exception the rollback fires
+    before the caller sees the error, leaving the DB in a clean state.
+    """
+    session: Session = db.SessionLocal()
+    try:
+        yield session
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
