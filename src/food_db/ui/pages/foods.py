@@ -28,7 +28,7 @@ def _filter_options(_db):
 
 def _bust_cache():
     """Call after any DB write so dropdowns reflect the change on next rerun."""
-    st.cache_data.clear()
+    _filter_options.clear()
 
 
 def render_page(*, db):
