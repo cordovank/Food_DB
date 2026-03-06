@@ -5,7 +5,18 @@ from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+import logging
 import os
+
+
+def configure_logging(level: str = "INFO") -> None:
+    """Configure root logger. Call once from app entry points (app.py, cli/main.py)."""
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
+        datefmt="%H:%M:%S",
+        level=getattr(logging, level.upper(), logging.INFO),
+        force=True,
+    )
 
 class Settings(BaseSettings):
     """Local configuration.

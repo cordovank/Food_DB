@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -9,6 +8,11 @@ from food_db.config import settings as _settings
 from food_db.core.models import FoodCreate, FoodUpdate, ParsedNutrition, FoodVariantCreate, InventoryItemCreate, InventoryItemUpdate, FoodOut
 from food_db.core.repository import FoodRepository
 from food_db.utils.search import fuzzy_score
+
+import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -160,6 +164,7 @@ class FoodDatabase:
         """Convert ParsedNutrition into a FoodCreate, then upsert."""
         if not parsed.name:
             raise ValueError("ParsedNutrition.name is required to add to DB")
+        logger.info("add_from_parsed: upserting food name=%r", parsed.name)
 
         data = FoodCreate(
             name=parsed.name,
@@ -197,20 +202,23 @@ class FoodDatabase:
         return self.upsert_food(data)
 
     def export_json(self, out_path: Path) -> Path:
+        logger.info("export_json: writing to %s", out_path)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         rows = self.repo.export_foods()
         out_path.write_text(json.dumps(rows, indent=2, default=str), encoding="utf-8")
+        logger.info("export_json: wrote %d foods", len(rows))
         return out_path
 
     def export_csv(self, out_path: Path) -> Path:
+        logger.info("export_csv: writing to %s", out_path)
         try:
             import pandas as pd
         except Exception as e:
             raise RuntimeError("CSV export requires optional dependency: uv sync --extra export") from e
-
         out_path.parent.mkdir(parents=True, exist_ok=True)
         rows = self.repo.export_foods()
         pd.DataFrame(rows).to_csv(out_path, index=False)
+        logger.info("export_csv: wrote %d foods", len(rows))
         return out_path
     
     def export_foods(self) -> list[dict]:

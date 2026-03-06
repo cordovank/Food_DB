@@ -57,14 +57,17 @@ class FoodRepository:
     # For destructive changes, create a new migration script instead.
     
     def init_db(self) -> None:
+        logger.info("Initializing DB schema at %s", self.db.engine.url)
         Base.metadata.create_all(self.db.engine)
-        with self.db.engine.begin() as conn:
+        logger.debug("create_all complete")
 
+        with self.db.engine.begin() as conn:
             # ── foods migration ────────────────────────────────────────────
             foods_cols = {row[1] for row in conn.execute(sql_text("PRAGMA table_info(foods)")).fetchall()}
 
             def add_food_col(name: str, ddl: str):
                 if name not in foods_cols:
+                    logger.info("Migrating foods: adding column %s %s", name, ddl)
                     conn.execute(sql_text(f"ALTER TABLE foods ADD COLUMN {name} {ddl}"))
 
             add_food_col("servings_per_container", "FLOAT")
@@ -130,11 +133,14 @@ class FoodRepository:
         with get_session(self.db) as s:
             existing = s.scalar(select(Food).where(Food.name == data.name))
             if existing:
+                logger.info("upsert_food: updating existing food id=%d name=%r", existing.id, data.name)
                 for k, v in data.model_dump().items():
                     setattr(existing, k, v)
                 s.commit()
                 s.refresh(existing)
                 return self._food_out(existing)
+            
+            logger.info("upsert_food: inserting new food name=%r", data.name)
             food = Food(**data.model_dump())
             s.add(food)
             s.commit()
@@ -165,18 +171,25 @@ class FoodRepository:
         with get_session(self.db) as s:
             food = s.get(Food, food_id)
             if not food:
+                logger.warning("update_food: food id=%d not found", food_id)
                 return None
             for k, v in patch.model_dump(exclude_unset=True).items():
                 setattr(food, k, v)
             s.commit()
             s.refresh(food)
+            logger.info("update_food: updated food id=%d name=%r", food.id, food.name)
             return self._food_out(food)
 
     def delete_food(self, food_id: int) -> bool:
         with get_session(self.db) as s:
             res = s.execute(delete(Food).where(Food.id == food_id))
             s.commit()
-            return (res.rowcount or 0) > 0
+            deleted = (res.rowcount or 0) > 0
+            if deleted:
+                logger.info("delete_food: removed food id=%d", food_id)
+            else:
+                logger.warning("delete_food: food id=%d not found", food_id)
+            return deleted
 
     # -------------------------
     # Smart Search

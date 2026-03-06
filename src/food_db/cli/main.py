@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import json
+import typer
+
 from datetime import date
 from pathlib import Path
-from typing import Optional
-
-import typer
 from rich import print
 from rich.table import Table
+from typing import Optional
 
-from food_db.config import settings
+from food_db.config import configure_logging, settings
 from food_db.core.models import FoodCreate, FoodUpdate, FoodVariantCreate
 from food_db.core.services import make_food_db
 from food_db.core.usecases import parse_text_to_nutrition, ocr_image_to_nutrition
+
+configure_logging(level="INFO")
 
 
 def _parse_date(s: str | None) -> date | None:

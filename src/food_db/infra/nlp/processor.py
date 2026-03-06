@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from datetime import date
 from typing import Optional
 
 from food_db.core.models import ParsedNutrition
+
+logger = logging.getLogger(__name__)
 
 
 _NUM = r"(?P<val>\d+(?:\.\d+)?)"
@@ -151,7 +154,9 @@ class FoodTextProcessor:
         if out.serving_size is None or out.serving_unit is None:
             warnings.append("Serving size missing or incomplete.")
 
-        out.warnings = warnings
+        for w in warnings:
+            logger.warning("FoodTextProcessor: %s", w)
+        out.warnings = warnings    
         return out
 
     # -------------------------

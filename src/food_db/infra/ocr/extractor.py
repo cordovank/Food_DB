@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import cv2
+import logging
 import numpy as np
+import pillow_heif
 import pytesseract
 import tempfile
 
 from dataclasses import dataclass, field
-from pathlib import Path
 from io import BytesIO
+from pathlib import Path
 from PIL import Image
-import pillow_heif
 
 from food_db.config import settings
+
+logger = logging.getLogger(__name__)
+
 
 # Enable PIL to open HEIC/HEIF
 pillow_heif.register_heif_opener()
@@ -32,6 +36,8 @@ class FoodOCRExtractor:
     )
 
     def extract_text(self, image_path: Path) -> str:
+        logger.info("FoodOCRExtractor: tesseract_cmd=%r image=%s", self.tesseract_cmd, image_path)
+
         if self.tesseract_cmd:
             pytesseract.pytesseract.tesseract_cmd = self.tesseract_cmd
         
@@ -55,7 +61,9 @@ class FoodOCRExtractor:
 
             config = r"--oem 3 --psm 6"
             text = pytesseract.image_to_string(binary, config=config)
-            return (text or "").strip()
+            result = (text or "").strip()
+            logger.debug("FoodOCRExtractor: extracted %d chars", len(result))
+            return result
         finally:
             if temp_created:
                 resolved.unlink(missing_ok=True)
