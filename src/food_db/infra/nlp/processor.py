@@ -90,8 +90,21 @@ class FoodTextProcessor:
         out.carbs_g = self._grams(r"total\s*carbohydrate|carbohydrate|carb", t)
         out.fat_g = self._grams(r"total\s*fat|fat", t)
         out.fiber_g = self._grams(r"dietary\s*fiber|fiber|fibre", t)
-        out.sugar_g = self._grams(r"total\s*sugars|sugars|sugar", t)
-        out.added_sugar_g = self._grams(r"added\s*sugars?", t)  # covers "Includes 0g Added Sugars"
+
+        # Parse added_sugar_g FIRST (most specific) to prevent bleed into sugar_g.
+        # Two label formats exist:
+        #   "Added Sugars 2g"           → standard _grams() pattern
+        #   "Includes 2g Added Sugars"  → number precedes nutrient name
+        out.added_sugar_g = self._grams(r"added\s*sugars?", t)
+        if out.added_sugar_g is None:
+            m = re.search(
+                r"includes\s+" + _NUM + r"\s*g\s+added\s*sugars?",
+                t,
+                flags=re.I,
+            )
+            if m:
+                out.added_sugar_g = float(m.group("val"))
+        out.sugar_g = self._grams(r"total\s*sugars?|sugars?|sugar", t)
 
         out.saturated_fat_g = self._grams(r"saturated\s*fat", t)
         out.trans_fat_g = self._grams(r"trans\s*fat", t)
@@ -164,6 +177,8 @@ class FoodTextProcessor:
 
     def _grams(self, nutrient_pattern: str, text: str) -> Optional[float]:
         # Match "Protein 7g" or "Protein: 7 g"; ignore "%DV".
+        # Word boundary after 'g' prevents matching inside longer strings.
+        # Patterns must be ordered most-specific → least-specific at the call site.
         pattern = rf"(?:{nutrient_pattern})\s*[:\-]?\s*" + _NUM + r"\s*g\b"
         return self._first_number(pattern, text)
 
