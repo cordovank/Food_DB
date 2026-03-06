@@ -370,7 +370,6 @@ class FoodRepository:
             return self._inventory_out(item)
 
     def list_inventory_for_variant(self, variant_id: int) -> list[InventoryItemOut]:
-        from sqlalchemy import select
         with get_session(self.db) as s:
             rows = s.scalars(
                 select(InventoryItem)
