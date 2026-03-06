@@ -251,8 +251,16 @@ def render_page(*, db):
         # ── Inventory tab ─────────────────────────────────────────────
         with tab_inv:
             variant_id = st.session_state.get(KEY_SELECTED_VARIANT_ID)
+
+            # Auto-select the first variant so the Inventory tab is
+            # immediately usable without visiting the Variants tab first.
+            if not variant_id and variants:
+                variant_id = variants[0].id
+                st.session_state[KEY_SELECTED_VARIANT_ID] = variant_id
+
             if not variant_id:
-                st.info("Select a variant in the Variants tab first.")
+                st.info("This food has no variants yet. Add one in the Variants tab first.")
+                
             else:
                 items = db.list_inventory_for_variant(variant_id)
                 if items:
