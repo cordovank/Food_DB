@@ -28,6 +28,10 @@ from food_db.core.models import (
 )
 from food_db.infra.db.sql_db import DbHandle, make_db, get_session
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 DEFAULT_UNITS: list[UnitCreate] = [
     UnitCreate(unit_name="gram", unit_symbol="g", to_grams=1.0, is_base=True),
@@ -238,12 +242,21 @@ class FoodRepository:
             rows = s.scalars(stmt).all()
 
             # --- Fallback for fuzzy typos / OCR noise ---
-            # If LIKE prefilter returns nothing, fetch a filtered candidate pool
-            # without the text_pred so Python fuzzy ranking can still work.
+            # If LIKE prefilter returns nothing, fetch a small filtered candidate
+            # pool without the text predicate so Python fuzzy ranking can still
+            # find near-matches. Capped well below candidate_limit to avoid
+            # full-table scans on large DBs.
+            _FALLBACK_LIMIT = 50
             if not rows and query.strip():
+                logger.debug(
+                    "search_foods_filtered: LIKE prefilter returned 0 rows for %r — "
+                    "falling back to unscoped candidate pool (limit=%d)",
+                    query,
+                    _FALLBACK_LIMIT,
+                )
                 fallback_stmt = (
                     base.where(and_(*preds)) if preds else base
-                ).distinct().order_by(Food.name.asc()).limit(max(1, int(limit)))
+                ).distinct().order_by(Food.name.asc()).limit(_FALLBACK_LIMIT)
                 rows = s.scalars(fallback_stmt).all()
 
             return [self._food_out(r) for r in rows]
