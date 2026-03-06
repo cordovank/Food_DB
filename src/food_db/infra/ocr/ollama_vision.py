@@ -1,13 +1,8 @@
 from __future__ import annotations
 
-import json
-import socket
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from openai import OpenAI
 from pathlib import Path
-from typing import Any
 
 from food_db.config import settings
 from food_db.infra.ocr.errors import OCRException, OCRErrorType
