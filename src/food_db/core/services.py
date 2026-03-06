@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from food_db.config import settings as _settings
-from food_db.core.models import FoodCreate, FoodUpdate, ParsedNutrition, FoodVariantCreate, InventoryItemCreate, InventoryItemUpdate
+from food_db.core.models import FoodCreate, FoodUpdate, ParsedNutrition, FoodVariantCreate, InventoryItemCreate, InventoryItemUpdate, FoodOut
 from food_db.core.repository import FoodRepository
 from food_db.utils.search import fuzzy_score
 
@@ -212,7 +212,10 @@ class FoodDatabase:
         rows = self.repo.export_foods()
         pd.DataFrame(rows).to_csv(out_path, index=False)
         return out_path
-
+    
+    def export_foods(self) -> list[dict]:
+        """Return all foods as dicts for admin display. Use list_foods_paged() for large DBs."""
+        return self.repo.export_foods()
 
 def make_food_db(db_path: Path) -> FoodDatabase:
     return FoodDatabase(repo=FoodRepository.from_path(db_path))

@@ -1,9 +1,6 @@
 from __future__ import annotations
 import streamlit as st
 
-
-# ── Export helpers ────────────────────────────────────────────────────────────
-
 _EXPORTS = [
     {
         "format":      "JSON",
@@ -21,9 +18,10 @@ _EXPORTS = [
     },
 ]
 
+_PAGE_SIZE = 100  # foods rows per page in the admin dataframe
+
 
 def _run_export(db, settings, method: str, filename: str) -> None:
-    """Invoke the requested export method and surface result or error."""
     out_path = settings.project_root / "data" / filename
     try:
         p = getattr(db, method)(out_path)
@@ -34,12 +32,9 @@ def _run_export(db, settings, method: str, filename: str) -> None:
         st.error(f"Export failed: {exc}")
 
 
-# ── Page ──────────────────────────────────────────────────────────────────────
-
 def render_page(*, db, settings) -> None:
     st.subheader("Export")
 
-    # ── Export actions ────────────────────────────────────────────────────
     for spec in _EXPORTS:
         col_btn, col_desc = st.columns([1, 4])
         if col_btn.button(spec["button"], type="primary", key=f"export_{spec['format']}"):
@@ -64,7 +59,29 @@ def render_page(*, db, settings) -> None:
         t_foods, t_inv, t_units = st.tabs(["Foods", "Inventory", "Units"])
 
         with t_foods:
-            st.dataframe(db.repo.export_foods(), width='stretch')
+            total = counts["foods"]
+            if total == 0:
+                st.info("No foods yet.")
+            else:
+                # Pagination controls
+                max_page = max(0, (total - 1) // _PAGE_SIZE)
+                page = st.number_input(
+                    f"Page (1–{max_page + 1})",
+                    min_value=1,
+                    max_value=max_page + 1,
+                    value=1,
+                    step=1,
+                    key="admin_foods_page",
+                )
+                offset = (page - 1) * _PAGE_SIZE
+                rows = db.list_foods_paged(offset=offset, limit=_PAGE_SIZE)
+                st.caption(
+                    f"Showing {offset + 1}–{min(offset + len(rows), total)} of {total} foods"
+                )
+                st.dataframe(
+                    [r.model_dump() for r in rows],
+                    width='stretch',
+                )
 
         with t_inv:
             rows = db.inventory_all()
