@@ -105,22 +105,36 @@ def render_food_form(
 
         # ── More nutrition ────────────────────────────────────────────────
         with st.expander("More nutrition", expanded=False):
+            st.caption("Fats")
             c1, c2, c3 = st.columns(3)
-            saturated_fat_g  = _opt_num("Saturated fat (g)",  _cur("saturated_fat_g"),  0.1, f"{form_key}_sat_fat")
-            trans_fat_g      = _opt_num("Trans fat (g)",      _cur("trans_fat_g"),      0.1, f"{form_key}_trans_fat")
-            cholesterol_mg   = _opt_num("Cholesterol (mg)",   _cur("cholesterol_mg"),   1.0, f"{form_key}_cholesterol")
+            with c1:
+                saturated_fat_g  = _opt_num("Saturated fat (g)",  _cur("saturated_fat_g"),  0.1, f"{form_key}_sat_fat")
+            with c2:
+                trans_fat_g      = _opt_num("Trans fat (g)",      _cur("trans_fat_g"),      0.1, f"{form_key}_trans_fat")
+            with c3:
+                cholesterol_mg   = _opt_num("Cholesterol (mg)",   _cur("cholesterol_mg"),   1.0, f"{form_key}_cholesterol")
 
+            st.caption("Carbohydrates")
             c1, c2, c3 = st.columns(3)
-            fiber_g      = _opt_num("Fiber (g)",       _cur("fiber_g"),      0.5, f"{form_key}_fiber_g")
-            sugar_g      = _opt_num("Sugar (g)",       _cur("sugar_g"),      0.5, f"{form_key}_sugar_g")
-            added_sugar_g= _opt_num("Added sugar (g)", _cur("added_sugar_g"),0.5, f"{form_key}_added_sugar_g")
+            with c1:
+                fiber_g      = _opt_num("Fiber (g)",       _cur("fiber_g"),      0.5, f"{form_key}_fiber_g")
+            with c2:
+                sugar_g      = _opt_num("Sugar (g)",       _cur("sugar_g"),      0.5, f"{form_key}_sugar_g")
+            with c3:
+                added_sugar_g= _opt_num("Added sugar (g)", _cur("added_sugar_g"),0.5, f"{form_key}_added_sugar_g")
 
+            st.caption("Micronutrients")
             c1, c2, c3, c4, c5 = st.columns(5)
-            sodium_mg      = _opt_num("Sodium (mg)",     _cur("sodium_mg"),     1.0, f"{form_key}_sodium_mg")
-            vitamin_d_mcg  = _opt_num("Vitamin D (mcg)", _cur("vitamin_d_mcg"), 0.1, f"{form_key}_vitamin_d_mcg")
-            calcium_mg     = _opt_num("Calcium (mg)",    _cur("calcium_mg"),    1.0, f"{form_key}_calcium_mg")
-            iron_mg        = _opt_num("Iron (mg)",       _cur("iron_mg"),       0.1, f"{form_key}_iron_mg")
-            potassium_mg   = _opt_num("Potassium (mg)",  _cur("potassium_mg"),  1.0, f"{form_key}_potassium_mg")
+            with c1:
+                sodium_mg      = _opt_num("Sodium (mg)",     _cur("sodium_mg"),     1.0, f"{form_key}_sodium_mg")
+            with c2:
+                vitamin_d_mcg  = _opt_num("Vitamin D (mcg)", _cur("vitamin_d_mcg"), 0.1, f"{form_key}_vitamin_d_mcg")
+            with c3:
+                calcium_mg     = _opt_num("Calcium (mg)",    _cur("calcium_mg"),    1.0, f"{form_key}_calcium_mg")
+            with c4:
+                iron_mg        = _opt_num("Iron (mg)",       _cur("iron_mg"),       0.1, f"{form_key}_iron_mg")
+            with c5:
+                potassium_mg   = _opt_num("Potassium (mg)",  _cur("potassium_mg"),  1.0, f"{form_key}_potassium_mg")
 
         # ── Ingredients & dates ───────────────────────────────────────────
         with st.expander("Ingredients & dates", expanded=False):
