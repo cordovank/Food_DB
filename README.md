@@ -1,5 +1,7 @@
 # FoodDB 🍎 — Local Nutrition Facts Database (SQLite + CLI + Streamlit + OCR)
 
+![UI Main](images/FoodDB_UI.png)
+
 FoodDB is a **local-first** personal nutrition-facts catalogue that stores food items in a portable **SQLite** database file and exposes CRUD via:
 
 - **CLI** (`fooddb ...`)

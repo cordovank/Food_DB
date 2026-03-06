@@ -74,8 +74,6 @@ state.py
 components/
     select_or_other.py
     notifications.py
-    detail_panel.py
-    import_panel.py
     form_food.py
     form_variant.py
     form_inventory.py
