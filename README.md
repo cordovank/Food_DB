@@ -1,194 +1,173 @@
-# FoodDB 🍎 — Local Nutrition Facts Database (SQLite + CLI + Streamlit + OCR)
+# FoodDB 🍎 — Local Nutrition Facts Database
+
+A **local-first** personal nutrition catalogue backed by a portable **SQLite** file, with a full-featured **Streamlit UI** and **CLI** for CRUD, import, inventory tracking, and export.
 
 ![UI Main](images/FoodDB_UI.png)
-
-FoodDB is a **local-first** personal nutrition-facts catalogue that stores food items in a portable **SQLite** database file and exposes CRUD via:
-
-- **CLI** (`fooddb ...`)
-- **Streamlit UI** (runs on local network)
-
-Optional modules:
-- **OCR** (pytesseract + OpenCV) to read nutrition labels from images (including **HEIC/HEIF** via Pillow + pillow-heif)
-- **Text parsing** (regex-first) to convert label text into structured fields
+![UI Import](images/FoodDB_Import.png)
 
 ---
 
-## Features
+## What it does
 
-- **Portable storage:** `data/food_database.db` (copy it anywhere)
-- **Foods:** name, category, serving size/unit, macros, sodium, etc.
-- **Variants:** store/brand/price/package size (Costco/Aldi/Walmart/Publix, etc.)
-- **Units & conversions:** store common units + convert (g ↔ oz, etc.)
-- **Import:**
-  - paste label text → parse → save
-  - image upload (jpg/png/webp/heic/heif) → OCR → parse → save
-- **Single DB instance:** CLI writes are visible in the UI after refresh
-
----
-
-## Repo layout (recommended)
-
-```txt
-FOOD_DB
-├── data
-│   ├── export.json
-│   └── food_database.db
-├── src
-│   └── food_db
-│       ├── cli
-│       │   └── main.py
-│       ├── config.py
-│       ├── core
-│       │   ├── models.py
-│       │   ├── repository.py
-│       │   ├── services.py
-│       │   └── usecases.py
-│       ├── infra
-│       │   ├── db
-│       │   │   └── sql_db.py
-│       │   ├── nlp
-│       │   │   └── processor.py
-│       │   └── ocr
-│       │       └── extractor.py
-│       ├── ui
-│       │   └── app.py
-│       └── utils
-│           └── conversions.py
-├── tests
-```
+- **Store food items** with full nutrition facts (macros, micros, ingredients, best-by date)
+- **Track store variants** — same food from Costco vs. Aldi vs. Publix with price and package size
+- **Track inventory** — what you currently have on hand, per variant
+- **Import from a label** — paste text or upload a photo (JPG/PNG/WEBP/HEIC/HEIF); regex parser extracts structured fields automatically
+- **OCR two ways** — Tesseract (local, offline) or a local Ollama vision model (LLaVA/Qwen-VL style)
+- **Fuzzy search** — token overlap + SequenceMatcher scoring; filter by category, brand, or store
+- **Export** — JSON or CSV
+- **Unit conversions** — stored conversion table (g ↔ oz, etc.) with a UI calculator
 
 ---
 
-## Requirements
-
-- Python (recommended: 3.11–3.13)
-- `uv` for dependency + venv management
-- SQLite (included with Python)
-
-### Optional OCR requirements
-- `tesseract` binary installed on your OS
-- Python packages: `pytesseract`, `opencv-python`, `pillow`, `pillow-heif`
-
----
-
-## Quickstart (uv)
+## Quick start
 
 ```bash
+# 1. Clone and install
+git clone <repo-url>
 cd food_db
-uv venv
-uv sync
+uv venv && uv sync
 
-# Initialize DB + seed base units
+# 2. Initialize the database
 uv run fooddb db init
-```
 
-### Run Streamlit UI (local network)
-
-```bash
-# Run the UI (local network)
+# 3. Launch the UI (available on your local network)
 uv run streamlit run src/food_db/ui/app.py --server.address 0.0.0.0 --server.port 8501
 ```
 
-Then open:
-* On the same machine: http://localhost:8501
-* On another device on your LAN: http://<your-ip>:8501
+Open http://localhost:8501 in a browser. On another device on the same LAN, use `http://<your-ip>:8501`.
 
-> Tip: To restrict access further, use a firewall rule or bind to a specific interface.
+---
 
-### CLI usage (examples)
+## CLI cheat sheet
 
 ```bash
 # Add a food
-uv run fooddb food add \
-  --name "Greek Yogurt" \
-  --brand "Fage" \
-  --category "dairy" \
-  --serving-size 170 \
-  --serving-unit g \
-  --calories 120 \
-  --protein-g 20 \
-  --carbs-g 6 \
-  --fat-g 0
+uv run fooddb food add --name "Greek Yogurt" --brand "Fage" --category dairy \
+  --serving-size 170 --serving-unit g --calories 120 --protein-g 20 --carbs-g 6 --fat-g 0
 
-# Search foods
+# Search
 uv run fooddb food search "yogurt"
+uv run fooddb food search "yogurt" --brand Fage --store Costco
+
+# Add a store variant
+uv run fooddb variant add --food-id 1 --store Costco --price 8.99 --package-size 907 --package-unit g
+
+# Parse a label (text)
+uv run fooddb parse text --text "Calories 90, Protein 3g, Total Fat 1g, Sodium 140mg"
+
+# OCR a label image and save it
+uv run fooddb parse ocr path/to/label.jpg --save
 
 # Export
 uv run fooddb export json --out data/export.json
-uv run fooddb export --format csv  --out exports/foods.csv
+uv run fooddb export csv  --out data/export.csv
 ```
 
-## Enable OCR (including HEIC/HEIF) - OPTIONAL
+---
 
-Install OCR extras:
+## Optional: OCR setup
+
+OCR is **opt-in**. Install the extras:
 
 ```bash
 uv sync --extra ocr
 ```
 
-> Note: `pytesseract` requires the **Tesseract** binary installed on your OS.
+### Tesseract (default, offline)
 
-1) Install OS tesseract
+```bash
+brew install tesseract          # macOS
+# or: sudo apt-get install tesseract-ocr   (Linux)
+```
 
-    ```bash
-    # macOS (Homebrew)
-    brew install tesseract
+If the binary is not on `PATH`, set it in `.env`:
 
-    # Confirm
-    tesseract --version
-    ```
-    If your tesseract binary is not in `PATH`, set it in `FoodOCRExtractor` (see below).
+```env
+OCR_TESSERACT_CMD=/opt/homebrew/bin/tesseract
+```
 
-2) Install OCR dependencies via uv
+### Ollama vision model (alternative)
 
-    ```bash
-    uv add pytesseract opencv-python pillow pillow-heif
-    uv sync
-    ```
+Run a vision-capable model locally (e.g., `qwen3-vl:8b`):
 
-3) HEIC/HEIF support
+```bash
+ollama pull qwen3-vl:8b
+```
 
-    HEIC/HEIF works by decoding via Pillow + pillow-heif, then converting to a temporary PNG before OCR.
+Then switch backends in `.env`:
 
-    Implementation lives in: `src/food_db/infra/ocr/extractor.py`
-
-    **Key behaviors:**
-
-    * Uploading `.heic/.heif` in Streamlit works
-    * OCR always reads a PNG/JPG path that OpenCV can decode
-
-4) Configure tesseract path (macOS Apple Silicon)
-
-    In `src/food_db/infra/ocr/extractor.py`:
-
-    ```python
-    tesseract_cmd: str | None = "/opt/homebrew/bin/tesseract"
-    ```
-
---- 
-
-### Notes on “refresh reflects CLI changes”
-
-Both CLI and UI use the same SQLite file path from `food_db.config.settings.db_path`.
-
-* CLI writes → SQLite file updates immediately
-* UI reads from SQLite on refresh / rerun
-
-If you change the DB path, do it in one place (config) so both clients stay consistent.
+```env
+OCR_BACKEND=ollama_vision
+OLLAMA_VISION_MODEL=qwen3-vl:8b
+OLLAMA_HOST=http://localhost:11434
+```
 
 ---
 
-## Data model notes
+## Configuration (`.env`)
 
-- `foods` holds a **canonical product** (name, category, base serving, macros).
-- `food_variants` holds store/brand variants (e.g., Costco vs Aldi) with price + package sizing.
-- `units` stores conversion factors to grams.
+All settings are optional — defaults work out of the box.
+
+| Variable | Default | Description |
+|---|---|---|
+| `DB_PATH` | `data/food_database.db` | SQLite file location |
+| `OCR_BACKEND` | `tesseract` | `tesseract` or `ollama_vision` |
+| `OCR_TESSERACT_CMD` | *(system PATH)* | Absolute path to tesseract binary |
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
+| `OLLAMA_VISION_MODEL` | `qwen3-vl:8b` | Vision model name |
+| `UI_HOST` | `0.0.0.0` | Streamlit bind address |
+| `UI_PORT` | `8501` | Streamlit port |
+
+---
+
+## Requirements
+
+- Python 3.11–3.13
+- [`uv`](https://github.com/astral-sh/uv) for dependency management
+- SQLite (included with Python)
+- OCR extras (optional): see above
+
+---
+
+## Project layout
+
+```
+food_db/
+├── data/                   # SQLite file and exports (git-ignored)
+├── src/food_db/
+│   ├── config.py           # Settings (pydantic-settings, .env support)
+│   ├── cli/main.py         # Typer CLI
+│   ├── core/
+│   │   ├── models.py       # SQLAlchemy ORM + Pydantic schemas
+│   │   ├── repository.py   # DB access layer
+│   │   ├── services.py     # Service factory
+│   │   └── usecases.py     # Parse + OCR orchestration
+│   ├── infra/
+│   │   ├── db/sql_db.py    # SQLite + SQLAlchemy session management
+│   │   ├── nlp/processor.py # Regex-based label text parser
+│   │   └── ocr/            # Tesseract + Ollama vision backends
+│   ├── ui/                 # Streamlit app and pages
+│   └── utils/              # Conversions, fuzzy search
+└── tests/
+```
+
+For a deeper walkthrough of each layer, see [`docs/TECHNICAL.md`](docs/TECHNICAL.md).
+
+---
+
+## Data model (summary)
+
+- **`foods`** — canonical product (name, category, brand, serving, full nutrition facts)
+- **`food_variants`** — store/brand-specific entries with price and package sizing
+- **`inventory_items`** — quantity on hand, linked to a variant
+- **`units`** — conversion table (e.g., g ↔ oz)
 
 ---
 
 ## Future scope
 
-* LLM integration (meal planning + macro balancing)
-* Inventory forecasting (simple models / scikit-learn)
-* Smart search (fuzzy matching + filters)
-* UI dropdowns for brands/stores/units populated from DB
+- LLM-assisted meal planning and macro balancing
+- Inventory forecasting (simple predictive models)
+- Smarter fuzzy search (embeddings or BM25)
+- Barcode scanning integration
