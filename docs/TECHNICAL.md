@@ -1,8 +1,21 @@
 # FoodDB — Technical Reference
 
 > Extended documentation for contributors and maintainers.
-> The main README covers quickstart and usage. This document covers
+> The main README covers quickstart and usage (briefly mentioned here). This document covers
 > architecture, design decisions, module internals, and extension points.
+
+---
+
+## Usage: What it does?
+
+- **Store food items** with full nutrition facts (macros, micros, ingredients, best-by date)
+- **Track store variants** — same food from Costco vs. Aldi vs. Publix with price and package size
+- **Track inventory** — what you currently have on hand, per variant
+- **Import from a label** — paste text or upload a photo (JPG/PNG/WEBP/HEIC/HEIF); regex parser extracts structured fields automatically
+- **OCR two ways** — Tesseract (local, offline) or a local Ollama vision model (LLaVA/Qwen-VL style)
+- **Fuzzy search** — token overlap + SequenceMatcher scoring; filter by category, brand, or store
+- **Export** — JSON or CSV
+- **Unit conversions** — stored conversion table (g ↔ oz, etc.) with a UI calculator
 
 ---
 
